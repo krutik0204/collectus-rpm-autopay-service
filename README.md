@@ -35,4 +35,14 @@ Docs: http://127.0.0.1:8000/docs
 
 ## AI
 
-`USE_MOCK_AI=true` uses built-in scorecard. Set `USE_MOCK_AI=false` + `AI_DECISION_URL` for teammate service.
+Decisions come from [smart-charge-decision-service](https://github.com/krutik0204/collectus-smart-charge-decision-service)
+(trained model + expected-value policy), deployed at
+`https://collectus-smart-charge-decision-service.onrender.com`.
+
+| Env | Value |
+| --- | --- |
+| `USE_MOCK_AI` | `false` — call the AI service (`true` = built-in scorecard) |
+| `AI_DECISION_URL` | `https://collectus-smart-charge-decision-service.onrender.com/v1/decide` (local: `http://127.0.0.1:8001/v1/decide`) |
+
+If the AI service is unreachable (e.g. Render free-tier cold start), the backend falls back to the
+built-in scorecard and labels the decision `mock-fallback`. Warm both services before a demo.

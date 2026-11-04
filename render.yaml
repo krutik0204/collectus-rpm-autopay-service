@@ -11,7 +11,9 @@ services:
       - key: APP_ENV
         value: production
       - key: USE_MOCK_AI
-        value: "true"
+        value: "false"
+      - key: AI_DECISION_URL
+        value: https://collectus-smart-charge-decision-service.onrender.com/v1/decide
       - key: PYTHON_VERSION
         value: "3.11.9"
       - key: CORS_ORIGINS
