@@ -49,14 +49,17 @@ built-in scorecard and labels the decision `mock-fallback`. Warm both services b
 
 ## Demo personas
 
-| Customer | Scenario | Smart Autocharge after paying one overdue installment |
-| --- | --- | --- |
-| Aisha Al-Harbi | Healthy card, just repaid | **charge** full overdue |
-| Omar Nasser | Weak card, 4 recent fails | **skip** — ask to update card |
-| Layla Hassan | Mid profile | **partial** 50% |
-| Fahad Al-Qahtani | 5 failed attempts this week | **skip** by hard gate (decline budget) — model not called |
-| Noura Al-Otaibi | PS5, 3 overdue | **partial** 75% of a large balance |
-| Khalid Al-Shehri | ~2 months overdue | **partial** 50% — long-overdue penalty |
-| Reem Al-Dosari | Card recovering from fails | **partial** 25% — smallest step |
-| Yusuf Al-Ghamdi | Overdue on two orders (pay a **Nike** installment) | **charge** remaining overdue across both orders |
-| Sara Al-Mutairi | Only one overdue | no autocharge — upcoming is never charged |
+Each customer has a monthly scheme decline budget (Mada allows 3). A failed autocharge uses one;
+with none left, neither Smart Autocharge nor cron will attempt.
+
+| Customer | Declines left | Scenario | Smart Autocharge after paying one overdue installment |
+| --- | --- | --- | --- |
+| Aisha Al-Harbi | 3 | Healthy card, just repaid | **charge** full overdue |
+| Omar Nasser | 2 | Weak card, 4 recent fails | **skip** — below the 10% bar, ask to update card |
+| Layla Hassan | 2 | Mid profile | **charge** full overdue (~49–61% likely) |
+| Fahad Al-Qahtani | 0 | No declines left, 5 fails | **skip** by hard gate — model not called |
+| Noura Al-Otaibi | 3 | PS5, 3 overdue | **charge** the remaining SAR 1,049.50 |
+| Khalid Al-Shehri | 3 | ~2 months overdue | **charge** — still worth it at the repayment moment |
+| Reem Al-Dosari | 1 | Last decline of the month | **skip** — needs 30%, ~20–28% likely, saves the decline |
+| Yusuf Al-Ghamdi | 3 | Overdue on two orders (pay a **Nike** installment) | **charge** remaining overdue across both orders |
+| Sara Al-Mutairi | 3 | Only one overdue | no autocharge — upcoming is never charged |

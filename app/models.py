@@ -26,6 +26,7 @@ class CustomerOut(BaseModel):
     pm_health: float
     fails_7d: int
     recent_success: float
+    declines_left: int = 3
     currency: str = "SAR"
     scenario: str
     notes: str = ""
@@ -64,6 +65,7 @@ class FeatureSet(BaseModel):
     repayment_strength: float
     overdue_amount: float
     amount_paid: float
+    declines_left: Optional[int] = None  # scheme declines left this month (Mada 3, Visa/MC 6)
 
 
 class DecisionRequest(BaseModel):

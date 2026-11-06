@@ -23,6 +23,7 @@ from app.db import (
     save_decision,
     save_event,
     touch_customer_activity,
+    use_decline,
 )
 from app.models import (
     AutopayResult,
@@ -117,6 +118,7 @@ async def _run_smart_autocharge(
         repayment_strength=_repayment_strength(amount_paid, overdue_before),
         overdue_amount=overdue_before,
         amount_paid=amount_paid,
+        declines_left=int(customer.get("declines_left", 3)),
     )
 
     decision_payload = DecisionRequest(
@@ -178,6 +180,7 @@ async def _run_smart_autocharge(
             smart_status = "skipped_by_ai"
         elif charge_result.status == "failed":
             smart_status = "failed"
+            use_decline(customer_id)
         else:
             smart_status = "skipped"
         smart_amount = 0.0
@@ -328,6 +331,9 @@ async def run_collections_cron(
         if not overdue_items:
             skipped += 1
             continue
+        if int(customer.get("declines_left", 3)) <= 0:
+            skipped += 1  # scheme limit: no declines left this month
+            continue
 
         overdue_before = round(sum(float(i["amount"]) for i in overdue_items), 2)
         currency = customer.get("currency", "SAR")
@@ -370,6 +376,7 @@ async def run_collections_cron(
         else:
             skipped += 1
             status = "failed"
+            use_decline(cid)
             amount = overdue_before
 
         add_payment_history(
