@@ -26,6 +26,16 @@ def mock_decide(payload: DecisionRequest) -> DecisionResponse:
             source="mock",
         )
 
+    if features.declines_left is not None and features.declines_left <= 0:
+        return DecisionResponse(
+            action=DecisionAction.SKIP,
+            amount=0,
+            score=0.0,
+            reason="Hard gate: no scheme declines left this month — skip",
+            baseline_action=DecisionAction.CHARGE,
+            source="mock",
+        )
+
     if features.pm_health < 0.35 or features.fails_7d >= 3:
         return DecisionResponse(
             action=DecisionAction.SKIP,

@@ -17,76 +17,84 @@ CUSTOMERS = [
         "name": "Aisha Al-Harbi",
         "pm_health": 0.9,
         "fails_7d": 0,
+        "declines_left": 3,
         "recent_success": 0.85,
         "currency": "SAR",
         "scenario": "clear_charge",
-        "notes": "Healthy payment method — Smart Autocharge should recover overdue",
+        "notes": "Healthy card, just repaid — AI charges the full overdue",
     },
     {
         "customer_id": "c_skip_001",
         "name": "Omar Nasser",
         "pm_health": 0.25,
         "fails_7d": 4,
+        "declines_left": 2,
         "recent_success": 0.15,
         "currency": "SAR",
         "scenario": "clear_skip",
-        "notes": "Fragile PM / recent fails — Smart Autocharge should SKIP",
+        "notes": "Weak card, 4 recent fails — P(success) below the 10% bar, AI skips and asks to update card",
     },
     {
         "customer_id": "c_partial_001",
         "name": "Layla Hassan",
         "pm_health": 0.6,
         "fails_7d": 1,
+        "declines_left": 2,
         "recent_success": 0.55,
         "currency": "SAR",
-        "scenario": "partial",
-        "notes": "Mid confidence — Smart Autocharge may PARTIAL charge",
+        "scenario": "mid_charge",
+        "notes": "Mid profile — repayment moment clears the bar, AI charges the full overdue",
     },
     {
         "customer_id": "c_cap_001",
         "name": "Fahad Al-Qahtani",
         "pm_health": 0.7,
         "fails_7d": 5,
+        "declines_left": 0,
         "recent_success": 0.5,
         "currency": "SAR",
         "scenario": "attempt_cap",
-        "notes": "5 failed attempts this week — hard gate SKIP before the model (scheme decline budget)",
+        "notes": "No scheme declines left this month (5 fails) — hard gate SKIP before the model",
     },
     {
         "customer_id": "c_big_001",
         "name": "Noura Al-Otaibi",
         "pm_health": 0.8,
         "fails_7d": 0,
+        "declines_left": 3,
         "recent_success": 0.75,
         "currency": "SAR",
-        "scenario": "big_basket_partial",
-        "notes": "PS5 with 3 overdue; pays one — AI collects ~75% of the remaining overdue",
+        "scenario": "big_basket",
+        "notes": "PS5 with 3 overdue; pays one — AI charges the remaining large balance in full",
     },
     {
         "customer_id": "c_late_001",
         "name": "Khalid Al-Shehri",
         "pm_health": 0.75,
         "fails_7d": 1,
+        "declines_left": 3,
         "recent_success": 0.6,
         "currency": "SAR",
         "scenario": "long_overdue",
-        "notes": "~2 months overdue — long-overdue penalty, AI takes a 50% partial",
+        "notes": "~2 months overdue — odds lower but the repayment moment is still worth it",
     },
     {
         "customer_id": "c_recover_001",
         "name": "Reem Al-Dosari",
-        "pm_health": 0.55,
-        "fails_7d": 2,
-        "recent_success": 0.45,
+        "pm_health": 0.5,
+        "fails_7d": 3,
+        "declines_left": 1,
+        "recent_success": 0.4,
         "currency": "SAR",
-        "scenario": "recovering_card",
-        "notes": "Card recovering from fails — AI takes the smallest 25% step",
+        "scenario": "last_decline",
+        "notes": "Last decline of the month — needs 30% odds; at ~20-28% AI saves it",
     },
     {
         "customer_id": "c_multi_001",
         "name": "Yusuf Al-Ghamdi",
         "pm_health": 0.9,
         "fails_7d": 0,
+        "declines_left": 3,
         "recent_success": 0.85,
         "currency": "SAR",
         "scenario": "multi_order",
@@ -97,6 +105,7 @@ CUSTOMERS = [
         "name": "Sara Al-Mutairi",
         "pm_health": 0.85,
         "fails_7d": 0,
+        "declines_left": 3,
         "recent_success": 0.8,
         "currency": "SAR",
         "scenario": "no_other_overdue",
@@ -204,6 +213,7 @@ def init_db() -> None:
                 name TEXT NOT NULL,
                 pm_health REAL NOT NULL,
                 fails_7d INTEGER NOT NULL,
+                declines_left INTEGER NOT NULL DEFAULT 3,
                 recent_success REAL NOT NULL,
                 currency TEXT NOT NULL DEFAULT 'SAR',
                 scenario TEXT NOT NULL,
@@ -285,8 +295,12 @@ def init_db() -> None:
         cols = {r["name"] for r in conn.execute("PRAGMA table_info(customers)").fetchall()}
         if "last_activity_at" not in cols:
             conn.execute("ALTER TABLE customers ADD COLUMN last_activity_at TEXT")
+        if "declines_left" not in cols:
+            conn.execute(
+                "ALTER TABLE customers ADD COLUMN declines_left INTEGER NOT NULL DEFAULT 3"
+            )
 
-        if not version or version["value"] != "5":
+        if not version or version["value"] != "6":
             conn.execute("DELETE FROM payment_history")
             conn.execute("DELETE FROM decisions")
             conn.execute("DELETE FROM events")
@@ -295,7 +309,7 @@ def init_db() -> None:
             conn.execute("DELETE FROM products")
             conn.execute("DELETE FROM customers")
             conn.execute(
-                "INSERT OR REPLACE INTO meta(key, value) VALUES ('schema_version', '5')"
+                "INSERT OR REPLACE INTO meta(key, value) VALUES ('schema_version', '6')"
             )
             _seed(conn)
 
@@ -305,15 +319,16 @@ def _seed(conn: sqlite3.Connection) -> None:
         conn.execute(
             """
             INSERT INTO customers (
-                customer_id, name, pm_health, fails_7d, recent_success,
+                customer_id, name, pm_health, fails_7d, declines_left, recent_success,
                 currency, scenario, notes, last_activity_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, NULL)
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NULL)
             """,
             (
                 customer["customer_id"],
                 customer["name"],
                 customer["pm_health"],
                 customer["fails_7d"],
+                customer["declines_left"],
                 customer["recent_success"],
                 customer["currency"],
                 customer["scenario"],
@@ -466,9 +481,18 @@ def reset_seed_data() -> None:
         conn.execute("DELETE FROM products")
         conn.execute("DELETE FROM customers")
         conn.execute(
-            "INSERT OR REPLACE INTO meta(key, value) VALUES ('schema_version', '5')"
+            "INSERT OR REPLACE INTO meta(key, value) VALUES ('schema_version', '6')"
         )
         _seed(conn)
+
+
+def use_decline(customer_id: str) -> None:
+    """A failed autocharge uses one of the card's scheme declines for the month."""
+    with get_connection() as conn:
+        conn.execute(
+            "UPDATE customers SET declines_left = MAX(declines_left - 1, 0) WHERE customer_id = ?",
+            (customer_id,),
+        )
 
 
 def touch_customer_activity(customer_id: str) -> None:
