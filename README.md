@@ -46,3 +46,17 @@ Decisions come from [smart-charge-decision-service](https://github.com/krutik020
 
 If the AI service is unreachable (e.g. Render free-tier cold start), the backend falls back to the
 built-in scorecard and labels the decision `mock-fallback`. Warm both services before a demo.
+
+## Demo personas
+
+| Customer | Scenario | Smart Autocharge after paying one overdue installment |
+| --- | --- | --- |
+| Aisha Al-Harbi | Healthy card, just repaid | **charge** full overdue |
+| Omar Nasser | Weak card, 4 recent fails | **skip** — ask to update card |
+| Layla Hassan | Mid profile | **partial** 50% |
+| Fahad Al-Qahtani | 5 failed attempts this week | **skip** by hard gate (decline budget) — model not called |
+| Noura Al-Otaibi | PS5, 3 overdue | **partial** 75% of a large balance |
+| Khalid Al-Shehri | ~2 months overdue | **partial** 50% — long-overdue penalty |
+| Reem Al-Dosari | Card recovering from fails | **partial** 25% — smallest step |
+| Yusuf Al-Ghamdi | Overdue on two orders (pay a **Nike** installment) | **charge** remaining overdue across both orders |
+| Sara Al-Mutairi | Only one overdue | no autocharge — upcoming is never charged |

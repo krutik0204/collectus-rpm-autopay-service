@@ -42,6 +42,66 @@ CUSTOMERS = [
         "scenario": "partial",
         "notes": "Mid confidence — Smart Autocharge may PARTIAL charge",
     },
+    {
+        "customer_id": "c_cap_001",
+        "name": "Fahad Al-Qahtani",
+        "pm_health": 0.7,
+        "fails_7d": 5,
+        "recent_success": 0.5,
+        "currency": "SAR",
+        "scenario": "attempt_cap",
+        "notes": "5 failed attempts this week — hard gate SKIP before the model (scheme decline budget)",
+    },
+    {
+        "customer_id": "c_big_001",
+        "name": "Noura Al-Otaibi",
+        "pm_health": 0.8,
+        "fails_7d": 0,
+        "recent_success": 0.75,
+        "currency": "SAR",
+        "scenario": "big_basket_partial",
+        "notes": "PS5 with 3 overdue; pays one — AI collects ~75% of the remaining overdue",
+    },
+    {
+        "customer_id": "c_late_001",
+        "name": "Khalid Al-Shehri",
+        "pm_health": 0.75,
+        "fails_7d": 1,
+        "recent_success": 0.6,
+        "currency": "SAR",
+        "scenario": "long_overdue",
+        "notes": "~2 months overdue — long-overdue penalty, AI takes a 50% partial",
+    },
+    {
+        "customer_id": "c_recover_001",
+        "name": "Reem Al-Dosari",
+        "pm_health": 0.55,
+        "fails_7d": 2,
+        "recent_success": 0.45,
+        "currency": "SAR",
+        "scenario": "recovering_card",
+        "notes": "Card recovering from fails — AI takes the smallest 25% step",
+    },
+    {
+        "customer_id": "c_multi_001",
+        "name": "Yusuf Al-Ghamdi",
+        "pm_health": 0.9,
+        "fails_7d": 0,
+        "recent_success": 0.85,
+        "currency": "SAR",
+        "scenario": "multi_order",
+        "notes": "Overdue on two orders; pay a Nike installment — AI clears the rest across both orders",
+    },
+    {
+        "customer_id": "c_single_001",
+        "name": "Sara Al-Mutairi",
+        "pm_health": 0.85,
+        "fails_7d": 0,
+        "recent_success": 0.8,
+        "currency": "SAR",
+        "scenario": "no_other_overdue",
+        "notes": "Only one overdue — paying it triggers no autocharge; upcoming is never charged",
+    },
 ]
 
 PRODUCTS = [
@@ -226,7 +286,7 @@ def init_db() -> None:
         if "last_activity_at" not in cols:
             conn.execute("ALTER TABLE customers ADD COLUMN last_activity_at TEXT")
 
-        if not version or version["value"] != "4":
+        if not version or version["value"] != "5":
             conn.execute("DELETE FROM payment_history")
             conn.execute("DELETE FROM decisions")
             conn.execute("DELETE FROM events")
@@ -235,7 +295,7 @@ def init_db() -> None:
             conn.execute("DELETE FROM products")
             conn.execute("DELETE FROM customers")
             conn.execute(
-                "INSERT OR REPLACE INTO meta(key, value) VALUES ('schema_version', '4')"
+                "INSERT OR REPLACE INTO meta(key, value) VALUES ('schema_version', '5')"
             )
             _seed(conn)
 
@@ -303,6 +363,32 @@ def _seed(conn: sqlite3.Connection) -> None:
         plan=4,
         overdue_sequences=(2, 3),
     )
+    _seed_overdue_order(
+        conn, customer_id="c_cap_001", product_id="p_nike", plan=4, overdue_sequences=(2, 3)
+    )
+    _seed_overdue_order(
+        conn, customer_id="c_big_001", product_id="p_ps5", plan=4, overdue_sequences=(2, 3, 4)
+    )
+    _seed_overdue_order(
+        conn,
+        customer_id="c_late_001",
+        product_id="p_ipad",
+        plan=4,
+        overdue_sequences=(2, 3),
+        overdue_days=60,
+    )
+    _seed_overdue_order(
+        conn, customer_id="c_recover_001", product_id="p_airpods", plan=4, overdue_sequences=(2, 3)
+    )
+    _seed_overdue_order(
+        conn, customer_id="c_multi_001", product_id="p_nike", plan=4, overdue_sequences=(2, 3)
+    )
+    _seed_overdue_order(
+        conn, customer_id="c_multi_001", product_id="p_perfume", plan=4, overdue_sequences=(2,)
+    )
+    _seed_overdue_order(
+        conn, customer_id="c_single_001", product_id="p_dyson", plan=4, overdue_sequences=(2,)
+    )
 
 
 def _split_amount(total: float, plan: int) -> list[float]:
@@ -320,6 +406,7 @@ def _seed_overdue_order(
     product_id: str,
     plan: int,
     overdue_sequences: tuple[int, ...],
+    overdue_days: int = 12,
 ) -> None:
     product = conn.execute(
         "SELECT * FROM products WHERE product_id = ?", (product_id,)
@@ -328,7 +415,7 @@ def _seed_overdue_order(
         return
     order_id = f"ord_seed_{customer_id}_{product_id}"
     amounts = _split_amount(float(product["price"]), plan)
-    created = (_today() - timedelta(days=70)).isoformat()
+    created = (_today() - timedelta(days=max(70, overdue_days + 58))).isoformat()
     conn.execute(
         """
         INSERT INTO orders (order_id, customer_id, product_id, total_amount, currency, plan, created_at)
@@ -337,14 +424,14 @@ def _seed_overdue_order(
         (order_id, customer_id, product_id, float(product["price"]), plan, created),
     )
     for idx, amount in enumerate(amounts, start=1):
-        due = _today() - timedelta(days=40 - (idx - 1) * 14)
+        due = _today() - timedelta(days=max(40, overdue_days + 28) - (idx - 1) * 14)
         if idx == 1:
             status = InstallmentStatus.PAID.value
             paid_at = (due - timedelta(days=1)).isoformat()
         elif idx in overdue_sequences:
             status = InstallmentStatus.OVERDUE.value
             paid_at = None
-            due = _today() - timedelta(days=12 + idx)
+            due = _today() - timedelta(days=overdue_days + plan - idx)
         else:
             status = InstallmentStatus.UPCOMING.value
             paid_at = None
@@ -379,7 +466,7 @@ def reset_seed_data() -> None:
         conn.execute("DELETE FROM products")
         conn.execute("DELETE FROM customers")
         conn.execute(
-            "INSERT OR REPLACE INTO meta(key, value) VALUES ('schema_version', '4')"
+            "INSERT OR REPLACE INTO meta(key, value) VALUES ('schema_version', '5')"
         )
         _seed(conn)
 
