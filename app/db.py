@@ -18,6 +18,9 @@ CUSTOMERS = [
         "pm_health": 0.9,
         "fails_7d": 0,
         "declines_left": 3,
+        "card_network": "mada",
+        "card_token": "apple_pay",
+        "card_funding": "debit",
         "recent_success": 0.85,
         "currency": "SAR",
         "scenario": "clear_charge",
@@ -29,10 +32,13 @@ CUSTOMERS = [
         "pm_health": 0.25,
         "fails_7d": 4,
         "declines_left": 2,
+        "card_network": "visa",
+        "card_token": "plastic",
+        "card_funding": "prepaid",
         "recent_success": 0.15,
         "currency": "SAR",
         "scenario": "clear_skip",
-        "notes": "Weak card, 4 recent fails — P(success) below the 10% bar, AI skips and asks to update card",
+        "notes": "Weak prepaid Visa, 4 recent fails — P(success) below the 10% bar, AI skips and asks to update card",
     },
     {
         "customer_id": "c_partial_001",
@@ -40,6 +46,9 @@ CUSTOMERS = [
         "pm_health": 0.6,
         "fails_7d": 1,
         "declines_left": 2,
+        "card_network": "mastercard",
+        "card_token": "plastic",
+        "card_funding": "credit",
         "recent_success": 0.55,
         "currency": "SAR",
         "scenario": "mid_charge",
@@ -51,6 +60,9 @@ CUSTOMERS = [
         "pm_health": 0.7,
         "fails_7d": 5,
         "declines_left": 0,
+        "card_network": "mada",
+        "card_token": "plastic",
+        "card_funding": "debit",
         "recent_success": 0.5,
         "currency": "SAR",
         "scenario": "attempt_cap",
@@ -62,6 +74,9 @@ CUSTOMERS = [
         "pm_health": 0.8,
         "fails_7d": 0,
         "declines_left": 3,
+        "card_network": "visa",
+        "card_token": "apple_pay",
+        "card_funding": "credit",
         "recent_success": 0.75,
         "currency": "SAR",
         "scenario": "big_basket",
@@ -73,6 +88,9 @@ CUSTOMERS = [
         "pm_health": 0.75,
         "fails_7d": 1,
         "declines_left": 3,
+        "card_network": "mada",
+        "card_token": "plastic",
+        "card_funding": "debit",
         "recent_success": 0.6,
         "currency": "SAR",
         "scenario": "long_overdue",
@@ -84,10 +102,27 @@ CUSTOMERS = [
         "pm_health": 0.5,
         "fails_7d": 3,
         "declines_left": 1,
+        "card_network": "mada",
+        "card_token": "plastic",
+        "card_funding": "debit",
         "recent_success": 0.4,
         "currency": "SAR",
         "scenario": "last_decline",
-        "notes": "Last decline of the month — needs 30% odds; at ~20-28% AI saves it",
+        "notes": "Mada card, last of 3 declines this month — needs 30% odds; at ~17-26% AI saves it",
+    },
+    {
+        "customer_id": "c_visa_001",
+        "name": "Huda Al-Zahrani",
+        "pm_health": 0.5,
+        "fails_7d": 3,
+        "declines_left": 3,
+        "card_network": "visa",
+        "card_token": "plastic",
+        "card_funding": "debit",
+        "recent_success": 0.4,
+        "currency": "SAR",
+        "scenario": "visa_spare_declines",
+        "notes": "Same profile as Reem, but a Visa card has 6 declines a month — 3 left, so AI tries",
     },
     {
         "customer_id": "c_multi_001",
@@ -95,6 +130,9 @@ CUSTOMERS = [
         "pm_health": 0.9,
         "fails_7d": 0,
         "declines_left": 3,
+        "card_network": "mastercard",
+        "card_token": "apple_pay",
+        "card_funding": "debit",
         "recent_success": 0.85,
         "currency": "SAR",
         "scenario": "multi_order",
@@ -106,6 +144,9 @@ CUSTOMERS = [
         "pm_health": 0.85,
         "fails_7d": 0,
         "declines_left": 3,
+        "card_network": "visa",
+        "card_token": "plastic",
+        "card_funding": "debit",
         "recent_success": 0.8,
         "currency": "SAR",
         "scenario": "no_other_overdue",
@@ -214,6 +255,9 @@ def init_db() -> None:
                 pm_health REAL NOT NULL,
                 fails_7d INTEGER NOT NULL,
                 declines_left INTEGER NOT NULL DEFAULT 3,
+                card_network TEXT NOT NULL DEFAULT 'mada',
+                card_token TEXT NOT NULL DEFAULT 'plastic',
+                card_funding TEXT NOT NULL DEFAULT 'debit',
                 recent_success REAL NOT NULL,
                 currency TEXT NOT NULL DEFAULT 'SAR',
                 scenario TEXT NOT NULL,
@@ -299,8 +343,13 @@ def init_db() -> None:
             conn.execute(
                 "ALTER TABLE customers ADD COLUMN declines_left INTEGER NOT NULL DEFAULT 3"
             )
+        for col, default in (("card_network", "mada"), ("card_token", "plastic"), ("card_funding", "debit")):
+            if col not in cols:
+                conn.execute(
+                    f"ALTER TABLE customers ADD COLUMN {col} TEXT NOT NULL DEFAULT '{default}'"
+                )
 
-        if not version or version["value"] != "6":
+        if not version or version["value"] != "7":
             conn.execute("DELETE FROM payment_history")
             conn.execute("DELETE FROM decisions")
             conn.execute("DELETE FROM events")
@@ -309,7 +358,7 @@ def init_db() -> None:
             conn.execute("DELETE FROM products")
             conn.execute("DELETE FROM customers")
             conn.execute(
-                "INSERT OR REPLACE INTO meta(key, value) VALUES ('schema_version', '6')"
+                "INSERT OR REPLACE INTO meta(key, value) VALUES ('schema_version', '7')"
             )
             _seed(conn)
 
@@ -319,9 +368,10 @@ def _seed(conn: sqlite3.Connection) -> None:
         conn.execute(
             """
             INSERT INTO customers (
-                customer_id, name, pm_health, fails_7d, declines_left, recent_success,
-                currency, scenario, notes, last_activity_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NULL)
+                customer_id, name, pm_health, fails_7d, declines_left, card_network,
+                card_token, card_funding, recent_success, currency, scenario, notes,
+                last_activity_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL)
             """,
             (
                 customer["customer_id"],
@@ -329,6 +379,9 @@ def _seed(conn: sqlite3.Connection) -> None:
                 customer["pm_health"],
                 customer["fails_7d"],
                 customer["declines_left"],
+                customer["card_network"],
+                customer["card_token"],
+                customer["card_funding"],
                 customer["recent_success"],
                 customer["currency"],
                 customer["scenario"],
@@ -394,6 +447,9 @@ def _seed(conn: sqlite3.Connection) -> None:
     )
     _seed_overdue_order(
         conn, customer_id="c_recover_001", product_id="p_airpods", plan=4, overdue_sequences=(2, 3)
+    )
+    _seed_overdue_order(
+        conn, customer_id="c_visa_001", product_id="p_airpods", plan=4, overdue_sequences=(2, 3)
     )
     _seed_overdue_order(
         conn, customer_id="c_multi_001", product_id="p_nike", plan=4, overdue_sequences=(2, 3)
@@ -481,7 +537,7 @@ def reset_seed_data() -> None:
         conn.execute("DELETE FROM products")
         conn.execute("DELETE FROM customers")
         conn.execute(
-            "INSERT OR REPLACE INTO meta(key, value) VALUES ('schema_version', '6')"
+            "INSERT OR REPLACE INTO meta(key, value) VALUES ('schema_version', '7')"
         )
         _seed(conn)
 

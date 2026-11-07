@@ -27,6 +27,9 @@ class CustomerOut(BaseModel):
     fails_7d: int
     recent_success: float
     declines_left: int = 3
+    card_network: str = "mada"
+    card_token: str = "plastic"
+    card_funding: str = "debit"
     currency: str = "SAR"
     scenario: str
     notes: str = ""
@@ -66,6 +69,9 @@ class FeatureSet(BaseModel):
     overdue_amount: float
     amount_paid: float
     declines_left: Optional[int] = None  # scheme declines left this month (Mada 3, Visa/MC 6)
+    card_network: Optional[str] = None  # mada | visa | mastercard
+    card_token: Optional[str] = None  # plastic | apple_pay
+    card_funding: Optional[str] = None  # debit | credit | prepaid
 
 
 class DecisionRequest(BaseModel):

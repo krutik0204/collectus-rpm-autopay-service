@@ -49,17 +49,19 @@ built-in scorecard and labels the decision `mock-fallback`. Warm both services b
 
 ## Demo personas
 
-Each customer has a monthly scheme decline budget (Mada allows 3). A failed autocharge uses one;
-with none left, neither Smart Autocharge nor cron will attempt.
+Each customer has a card (network, wallet, funding) and a monthly scheme decline budget by network
+(Mada 3, Visa/Mastercard 6). Both are sent to the AI. A failed autocharge uses one decline; with
+none left, neither Smart Autocharge nor cron will attempt.
 
-| Customer | Declines left | Scenario | Smart Autocharge after paying one overdue installment |
+| Customer | Card | Declines left | Smart Autocharge after paying one overdue installment |
 | --- | --- | --- | --- |
-| Aisha Al-Harbi | 3 | Healthy card, just repaid | **charge** full overdue |
-| Omar Nasser | 2 | Weak card, 4 recent fails | **skip** — below the 10% bar, ask to update card |
-| Layla Hassan | 2 | Mid profile | **charge** full overdue (~49–61% likely) |
-| Fahad Al-Qahtani | 0 | No declines left, 5 fails | **skip** by hard gate — model not called |
-| Noura Al-Otaibi | 3 | PS5, 3 overdue | **charge** the remaining SAR 1,049.50 |
-| Khalid Al-Shehri | 3 | ~2 months overdue | **charge** — still worth it at the repayment moment |
-| Reem Al-Dosari | 1 | Last decline of the month | **skip** — needs 30%, ~20–28% likely, saves the decline |
-| Yusuf Al-Ghamdi | 3 | Overdue on two orders (pay a **Nike** installment) | **charge** remaining overdue across both orders |
-| Sara Al-Mutairi | 3 | Only one overdue | no autocharge — upcoming is never charged |
+| Aisha Al-Harbi | Mada debit, Apple Pay | 3 | **charge** full overdue |
+| Omar Nasser | Visa prepaid card | 2 | **skip** — 1–2% likely, ask to update card |
+| Layla Hassan | Mastercard credit card | 2 | **charge** full overdue |
+| Fahad Al-Qahtani | Mada debit card | 0 | **skip** by hard gate — model not called |
+| Noura Al-Otaibi | Visa credit, Apple Pay | 3 | **charge** the remaining SAR 1,049.50 |
+| Khalid Al-Shehri | Mada debit card | 3 | **charge** — still worth it at the repayment moment |
+| Reem Al-Dosari | Mada debit card | 1 of 3 | **skip** — last decline needs 30%, ~17–26% likely |
+| Huda Al-Zahrani | Visa debit card | 3 of 6 | **charge** — same profile as Reem, but declines to spare |
+| Yusuf Al-Ghamdi | Mastercard debit, Apple Pay | 3 | **charge** remaining overdue across both orders (pay a **Nike** installment) |
+| Sara Al-Mutairi | Visa debit card | 3 | no autocharge — upcoming is never charged |

@@ -119,6 +119,9 @@ async def _run_smart_autocharge(
         overdue_amount=overdue_before,
         amount_paid=amount_paid,
         declines_left=int(customer.get("declines_left", 3)),
+        card_network=customer.get("card_network"),
+        card_token=customer.get("card_token"),
+        card_funding=customer.get("card_funding"),
     )
 
     decision_payload = DecisionRequest(
