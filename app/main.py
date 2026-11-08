@@ -29,6 +29,7 @@ from app.models import (
     PaymentDetailResponse,
     PaymentHistoryItem,
 )
+from app.services.insights import month_backtest
 from app.services.orchestrator import (
     checkout,
     pay_installment,
@@ -158,6 +159,12 @@ async def cron_collections(body: CronRequest) -> CronRunResult:
         customer_id=body.customer_id,
         scheduled_for=body.scheduled_for,
     )
+
+
+@app.get("/api/insights/backtest")
+async def insights_backtest(refresh: bool = False) -> dict:
+    """30-day backtest from the AI service: cron vs always-charge vs simple rule vs AI."""
+    return await month_backtest(settings, refresh=refresh)
 
 
 @app.get("/api/decisions")
